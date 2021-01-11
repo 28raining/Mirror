@@ -46,8 +46,3 @@ It is the same as other transport layers, i.e. simply add the peerJS component t
 ## Questions about Mirror
 - ServerUri has to exist in transport for Unity to build but it isn't needed?
 - Server tick rate has no effect on how often ServerSend() is called?
-
-## Reasons to merge into Mirror
-- Doesn't modify any existing code
-- Useful feature, several forums sobbing about this being missing
-- I (28raining) can offer support
