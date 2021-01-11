@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Unity WebGL Player | worms_v2</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+    <script src="TemplateData/UnityProgress.js"></script>
+    <script src="Build/UnityLoader.js"></script>
+    <script src="peerjs.min.js"></script>
+    <script>
+      var unityInstance = UnityLoader.instantiate("unityContainer", "Build/webGL.json", {onProgress: UnityProgress});
+    </script>
+  </head>
+  <body>
+    <div class="webgl-content">
+      <div id="unityContainer" style="width: 960px; height: 600px"></div>
+      <div class="footer">
+        <div class="webgl-logo"></div>
+        <div class="fullscreen" onclick="unityInstance.SetFullscreen(1)"></div>
+        <div class="title">worms_v2</div>
+      </div>
+    </div>
+    <button onclick="tempTest()">Test me</button>
+  </body>
+
+
+  <script>
+    function tempTest (){
+      unityInstance.SendMessage('NetworkManager','transport.OnClientConnected.Invoke');
+    }
+    var peer;
+    var conn;
+    var connDict = new Object();  //FIXME - use this when there's more than one conn!
+    var uniqueID = 2; //starting at 2 incase server is a client too
+    var serverDestroyed = false;
+    var amIServer = false;
+
+    ////////////////////////////////////////////
+    //// Functions called by Unity
+    ////////////////////////////////////////////
+    function jsSendString(x) {
+      var newData = JSON.parse(x);
+      if      (newData.task == 'serverStart') serverStart()
+      else if (newData.task == 'serverDisconnect') serverDisconnect(newData.channel);
+      else if (newData.task == 'serverSend') serverSend(newData.channel, newData.data);
+      else if (newData.task == 'serverDestroy') serverDestroy();
+      else if (newData.task == 'clientDisconnect') clientDisconnect();
+      else if (newData.task == 'clientConnect') clientConnect(newData.address);
+      else if (newData.task == 'clientSend') clientSend(newData.data);
+    }
+
+  
+    ////////////////////////////////////////////
+    //// Server interaction
+    ////////////////////////////////////////////
+    // register our existance and get an ID
+    // always created v early to increase reliabiltiy of peerJS signalling server. If created upon request, signalling server was very flakey.
+    function createPeer() {
+      // peer = new Peer({debug:3});
+      peer = new Peer();
+      peer.on('open', function(id) {
+        console.log('My peer ID is: ' + id);
+        setUpRx();
+      });
+      peer.on('error', function(err) { console.log(err) });
+    }
+
+    function setUpRx() {
+       //Listen for new connections
+       peer.on('connection', function(conn2) {
+        // console.log("felt something, is it open? " + conn2.open) // Part of double connect debug - FIXME
+        conn2.on('open', function() {
+          if (amIServer) {
+            var thisID = uniqueID; // risk here of 2 connections occuring at the same time
+            console.log("Somebody's tickling me! Their ID is " + thisID + " and their peerJS label is: " + conn2.label);
+            uniqueID = uniqueID + 1;
+            connDict[thisID] = conn2;
+            unityInstance.SendMessage('NetworkManager','jsserverConnect',thisID)
+
+            // Receive messages
+            conn2.on('data', function(data) {
+              var intArr = bytesToString(data) 
+              intArr['channel'] = thisID;
+              unityInstance.SendMessage('NetworkManager','jsServerReceivedData', JSON.stringify(intArr));
+            });
+
+            //Lost a client
+            conn2.on('error', function(err) { console.log(err); });
+            conn2.on('close', function() {
+              console.log("Lost client " + thisID)
+              var intArr = {channel: thisID}
+              unityInstance.SendMessage('NetworkManager','jsServerDisconnect', JSON.stringify(intArr));
+            });
+
+          } else {
+            console.log("Somebody's connecting to me but I am not a server. Disconnecting them...");
+            conn2.close();
+          }
+
+        });
+      });
+    }
+
+    function serverStart() {
+      //If the server was destroyed, create a new one
+      amIServer = true;
+      if (peer.destroyed) createPeer();   
+    }
+
+    function stringToBytes(data) {
+      var newStr = data.split(',').slice(0, -1);
+      var arr = new Uint8Array(newStr); //convert the string back to bytes for transmission
+      return {  binary: arr  };
+    }
+
+    function serverSend (channel, data) {
+      var obj = stringToBytes(data);
+      connDict[channel].send(obj); 
+    }
+
+    function serverDisconnect(channel) {
+      console.log("Removing client " + channel + " from the server");
+      connDict[channel].close();
+    }
+
+    function serverDestroy() {
+      console.log("Destroying the server");
+      amIServer = false;
+      if (peer != null) {
+        serverDestroyed = true;
+        if (!peer.destroyed) peer.destroy();
+      }
+    }
+
+    function clientDisconnect() {
+      console.log('Closing the connection');
+      if (conn != null) {
+        conn.close();
+      }
+    }
+
+    function bytesToString(data) {
+      var dv = new DataView(data.binary, 0); //fixme check the type of data before trying this? Some corruption could cause it to crash
+      var intArr = {binary: []}
+      for (var i=0; i<dv.byteLength; i++) intArr.binary.push(dv.getUint8(i))
+      return intArr;
+    }
+
+    function clientConnectToAddress(address){
+      conn = peer.connect(address);
+      conn.on('error', function(err) { console.log(err); });
+      conn.on('open', function() {
+        console.log('Succesfully Connected');
+        //inform Unity
+        unityInstance.SendMessage('NetworkManager','jsClientConnectSuccess')
+        // Receive messages
+        conn.on('data', function(data) {
+          var intArr = bytesToString(data)
+          unityInstance.SendMessage('NetworkManager','jsClientReceivedData', JSON.stringify(intArr));
+
+        });
+
+        conn.on('close', function() {
+          console.log("We lost the server...")
+          unityInstance.SendMessage('NetworkManager','jsClientDisconnect');
+        });
+      });
+
+    }
+
+    function clientConnect(address) {
+      console.log('Trying to connect here: ' + address);
+      clientConnectToAddress(address);
+    }
+
+    function clientSend(data) {
+      var obj = stringToBytes(data);
+      conn.send(obj); 
+    }
+
+    createPeer();
+  
+  </script>
+
+
+</html>

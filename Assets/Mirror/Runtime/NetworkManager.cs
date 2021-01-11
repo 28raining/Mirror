@@ -311,7 +311,7 @@ namespace Mirror
             // Copy auto-disconnect settings to NetworkServer
             NetworkServer.disconnectInactiveTimeout = disconnectInactiveTimeout;
             NetworkServer.disconnectInactiveConnections = disconnectInactiveConnections;
-
+            
             // start listening to network connections
             NetworkServer.Listen(maxConnections);
 
@@ -1488,6 +1488,46 @@ namespace Mirror
         /// </summary>
         public virtual void OnStopHost() { }
 
+        #endregion
+
+
+        #region peerJS support
+        #if !UNITY_EDITOR && UNITY_WEBGL
+            /// <summary>
+            /// Functions called by JavaScript when peerJS is used. Function names start with 'js'
+            /// <para>I'd much rather this code lived in peerJSTransport.cs, but SendMessage (called in JavaScript) can only communicate with Game Objects</para>
+            /// </summary>
+            public class MyClass_peerJS {
+                public int channel;
+                public byte [] binary;
+            }
+            void jsserverConnect(int label) {
+                Debug.Log("Telling the server that somebody has just connected with this ID: " + label);
+                transport.OnServerConnected.Invoke(label); 
+            }
+            void jsClientConnectSuccess() {
+                Debug.Log("Client connected to server");
+                transport.OnClientConnected.Invoke();
+            }
+            void jsServerReceivedData (string jsonData) {
+                MyClass_peerJS myObj_peerJS;
+                myObj_peerJS = JsonUtility.FromJson<MyClass_peerJS>(jsonData);
+                transport.OnServerDataReceived.Invoke(myObj_peerJS.channel, new ArraySegment<byte>(myObj_peerJS.binary), Channels.DefaultReliable);
+            }
+            void jsClientReceivedData (string jsonData) {
+                MyClass_peerJS myObj_peerJS;
+                myObj_peerJS = JsonUtility.FromJson<MyClass_peerJS>(jsonData);
+                transport.OnClientDataReceived.Invoke(new ArraySegment<byte>(myObj_peerJS.binary), Channels.DefaultReliable);
+            }
+            void jsServerDisconnect (string jsonData){
+                MyClass_peerJS myObj_peerJS;
+                myObj_peerJS = JsonUtility.FromJson<MyClass_peerJS>(jsonData);
+                transport.OnServerDisconnected.Invoke(myObj_peerJS.channel);
+            }
+            void jsClientDisconnect (){
+                transport.OnClientDisconnected.Invoke();
+            }
+        #endif
         #endregion
     }
 }
