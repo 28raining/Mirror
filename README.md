@@ -11,7 +11,7 @@ It uses peerJS which is a wrapper around WebRTC - the peer to peer connection pr
 It is the same as other transport layers, i.e. simply add the peerJS component to the NetworkManager and drag it into the transport box
 1. Add "Peer JS Trasnport" as a compnent to Network Manager
 2. Drag peerJS to transport box in Network Manager
-3. Copy Mirror/Runtime/Transport/PeerJS/WebGL Templates to Assets/. peerjs should now be selected in build -> player settings -> player -> WebGL Template 
+3. Copy Mirror/Runtime/Transport/PeerJS/WebGLTemplates to Assets/. peerjs should now be selected in build -> player settings -> player -> WebGL Template 
 4. (optional for cleanliness) move contents of Mirror/Runtime/Transport/PeerJS/Plugins to Assets/Plugins
 5. Build and run!
 

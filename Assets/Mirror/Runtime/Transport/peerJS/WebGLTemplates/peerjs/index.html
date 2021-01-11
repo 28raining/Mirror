@@ -22,14 +22,11 @@
         <div class="title">worms_v2</div>
       </div>
     </div>
-    <button onclick="tempTest()">Test me</button>
+    <h2 id="peerJSID">Become a server to get an address ID....</h2>
   </body>
 
 
   <script>
-    function tempTest (){
-      unityInstance.SendMessage('NetworkManager','transport.OnClientConnected.Invoke');
-    }
     var peer;
     var conn;
     var connDict = new Object();  //FIXME - use this when there's more than one conn!
@@ -62,6 +59,7 @@
       peer = new Peer();
       peer.on('open', function(id) {
         console.log('My peer ID is: ' + id);
+        if (amIServer) document.getElementById('peerJSID').innerHTML = "Connect to my address: " + id;
         setUpRx();
       });
       peer.on('error', function(err) { console.log(err) });
@@ -106,6 +104,7 @@
     function serverStart() {
       //If the server was destroyed, create a new one
       amIServer = true;
+      document.getElementById('peerJSID').innerHTML = "Connect to my address: " + peer.id;
       if (peer.destroyed) createPeer();   
     }
 
