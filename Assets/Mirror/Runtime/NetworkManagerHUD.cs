@@ -75,7 +75,7 @@ namespace Mirror
             if (!NetworkClient.active)
             {
                 // Server + Client
-                if (Application.platform != RuntimePlatform.WebGLPlayer)
+                if ((Application.platform != RuntimePlatform.WebGLPlayer)  || (Transport.activeTransport is peerJSTransport))
                 {
                     if (GUILayout.Button("Host (Server + Client)"))
                     {
@@ -93,10 +93,10 @@ namespace Mirror
                 GUILayout.EndHorizontal();
 
                 // Server Only
-                if (Application.platform == RuntimePlatform.WebGLPlayer)
+                if ((Application.platform == RuntimePlatform.WebGLPlayer) && !(Transport.activeTransport is peerJSTransport))
                 {
                     // cant be a server in webgl build
-                    GUILayout.Box("(  WebGL cannot be server  )");
+                    GUILayout.Box("(  WebGL cannot be server  ) ");
                 }
                 else
                 {
